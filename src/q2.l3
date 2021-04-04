@@ -1,0 +1,30 @@
+(define append 
+  (lambda(lst1 lst2)
+      @TODO
+  )
+)
+
+(define reverse 
+  (lambda (lst)
+        @TODO
+  )
+)
+
+(define duplicate-items
+   (lambda(lst dup-count)
+      @TODO
+   )
+)
+
+
+(define payment
+  (lambda (n coins-lst)
+        @TODO
+  )
+)
+                               
+(define compose-n
+  (lambda( f n)
+        @TODO
+  )
+)
