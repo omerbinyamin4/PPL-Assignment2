@@ -1,40 +1,64 @@
+(define empty?
+  (lambda (lst)
+  (if (equal? lst '()) #t #f)  
+  )
+)
+
+(define filter
+  (lambda (pred lst)
+    (if (empty? lst)
+        '()
+        (if (pred (car lst))
+            (cons (car lst) (filter pred (cdr lst)))
+            (filter pred (cdr lst))))))
+
+(define remove-all
+  (lambda (x lst)
+    (filter (lambda (y) (not (equal? x y)))
+            lst)))
+
+
 (define append 
   (lambda(lst1 lst2)
-      if (empty? lst1) lst2
-        if (empty? lst2) lst1
-          if (empty? (cdr lst1)) '((car lst1) lst2) '((car lst1) (append (cdr lst1) lst2)         
+      (if (empty? lst1) lst2
+        (if (empty? lst2) lst1
+          (if (empty? (cdr lst1)) (cons (car lst1) lst2) (cons (car lst1) (append (cdr lst1) lst2)))))         
   )
 )
 
 (define reverse 
   (lambda (lst)
-        if (empty? lst) '()
-          if (empty? (cdr lst)) lst (append (reverse (cdr lst) '((car lst '()))))
+        (if (empty? lst) '()
+          (if (empty? (cdr lst)) lst (append (reverse (cdr lst)) (list (car lst)))
+          )
+        )
   )
 )
 
 (define duplicate-item
-  (lambda (lst, counter)
-    if (= counter 0) '() (append lst (duplicate-item lst (- counter 1)))
+  (lambda (lst counter)
+    (if (= counter 0) '() (append lst (duplicate-item lst (- counter 1))))
   )
 )
+
 (define duplicate-items
    (lambda(lst dup-count)
-      if (empty? lst) '() 
-        (append (duplicate-item '((car lst) '()) '((car dup-count) '())) 
-                (duplicate-items (cdr lst) (append (cdr dup-count) '((car dup-count) '()))
-        )
+      (if (empty? lst) '() 
+        (append (duplicate-item (list (car lst)) (car dup-count)) 
+                (duplicate-items (cdr lst) (append (cdr dup-count) (list (car dup-count)))))
+      )
    )
 )
 
-
-
 (define payment
   (lambda (n coins-lst)
-    if (= n 0) 1
-      if (< n 0) 0
-        if (empty? coins-lst) 0
-          (+ (payment (- n (car coins-lst)) (cdr coins-lst)) (payment n (cdr coins-lst)))
+    (if (= n 0) 1
+      (if (< n 0) 0
+        (if (empty? coins-lst) 0
+          (+ (payment (- n (car coins-lst)) (cdr coins-lst)) (payment n (remove-all (car coins-lst) (cdr coins-lst))))
+         )
+       )
+     )
   )
 )
                                
