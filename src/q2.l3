@@ -1,6 +1,6 @@
 (define empty?
   (lambda (lst)
-  (if (equal? lst '()) #t #f)  
+  (if (eq? lst '()) #t #f)  
   )
 )
 
@@ -14,7 +14,7 @@
 
 (define remove-all
   (lambda (x lst)
-    (filter (lambda (y) (not (equal? x y)))
+    (filter (lambda (y) (not (eq? x y)))
             lst)))
 
 
@@ -63,7 +63,12 @@
 )
                                
 (define compose-n
-  (lambda( f n)
-        @TODO
+  (lambda (f n)
+    (if (= n 1)
+      f
+      (lambda (x)
+        (f ((compose-n f (- n 1)) x))
+      )
+    )
   )
 )

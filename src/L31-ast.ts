@@ -48,7 +48,7 @@ import { Sexp, Token } from "s-expression";
 
 export type Exp = DefineExp | CExp;
 export type AtomicExp = NumExp | BoolExp | StrExp | PrimOp | VarRef;
-export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp;
+export type CompoundExp = AppExp | IfExp | ProcExp | LetExp | LitExp | ClassExp;
 export type CExp =  AtomicExp | CompoundExp;
 
 export interface Program {tag: "Program"; exps: Exp[]; }
@@ -67,6 +67,8 @@ export interface Binding {tag: "Binding"; var: VarDecl; val: CExp; }
 export interface LetExp {tag: "LetExp"; bindings: Binding[]; body: CExp[]; }
 // L3
 export interface LitExp {tag: "LitExp"; val: SExpValue; }
+// L31
+export interface ClassExp {tag: "ClassExp"; fields: VarDecl[]; methods: Binding[];}
 
 // Type value constructors for disjoint types
 export const makeProgram = (exps: Exp[]): Program => ({tag: "Program", exps: exps});
@@ -92,6 +94,9 @@ export const makeLetExp = (bindings: Binding[], body: CExp[]): LetExp =>
 // L3
 export const makeLitExp = (val: SExpValue): LitExp =>
     ({tag: "LitExp", val: val});
+// L31
+export const makeClassExp = (fields: VarDecl[], methods: Binding[]) : ClassExp =>
+    ({tag: "ClassExp", fields: fields, methods: methods});
 
 // Type predicates for disjoint types
 export const isProgram = (x: any): x is Program => x.tag === "Program";
@@ -111,6 +116,8 @@ export const isBinding = (x: any): x is Binding => x.tag === "Binding";
 export const isLetExp = (x: any): x is LetExp => x.tag === "LetExp";
 // L3
 export const isLitExp = (x: any): x is LitExp => x.tag === "LitExp";
+// L31
+export const isClassExp = (x: any): x is ClassExp => x.tag === "ClassExp";
 
 // Type predicates for type unions
 export const isExp = (x: any): x is Exp => isDefineExp(x) || isCExp(x);
@@ -118,7 +125,7 @@ export const isAtomicExp = (x: any): x is AtomicExp =>
     isNumExp(x) || isBoolExp(x) || isStrExp(x) ||
     isPrimOp(x) || isVarRef(x);
 export const isCompoundExp = (x: any): x is CompoundExp =>
-    isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x);
+    isAppExp(x) || isIfExp(x) || isProcExp(x) || isLitExp(x) || isLetExp(x) || isClassExp(x);
 export const isCExp = (x: any): x is CExp =>
     isAtomicExp(x) || isCompoundExp(x);
 
@@ -162,6 +169,7 @@ export const parseL31SpecialForm = (op: Sexp, params: Sexp[]): Result<CExp> =>
     op === "lambda" ? parseProcExp(first(params), rest(params)) :
     op === "let" ? parseLetExp(first(params), rest(params)) :
     op === "quote" ? parseLitExp(first(params)) :
+    op === "class" ? parseClassExp(first(params), rest(params)) :
     makeFailure("Never");
 
 // DefineExp -> (define <varDecl> <CExp>)
@@ -237,6 +245,23 @@ const parseLetExp = (bindings: Sexp, body: Sexp[]): Result<LetExp> => {
 // sexps has the shape (quote <sexp>)
 export const parseLitExp = (param: Sexp): Result<LitExp> =>
     bind(parseSExp(param), (sexp: SExpValue) => makeOk(makeLitExp(sexp)));
+
+export const parseClassExp = (vars: Sexp, methods: Sexp): Result<ClassExp> =>{
+    if (!isGoodBindings(methods))
+        return makeFailure('Malformed bindings in "Class" expression');
+    if (!(isArray(vars) && allT(isString, vars)))
+        return  makeFailure(`Invalid vars for ClassExp`);
+    const methodsNames = map(a => a[0], methods);
+    const methodsBody = mapResult(methods => parseL31CExp(second(methods)), methods);
+    const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body)));
+    const fields = mapResult(makeOk(makeVarDecl), vars);
+    return safe2((vars: VarDecl[], methods: Binding[]) => makeOk(makeClassExp(vars, methods)))
+    (fields, methodsBindings); 
+}
+
+    // isArray(vars) && allT(isString, vars) ? bind(mapResult(parseL31CExp, methods),
+    //     (cexps: CExp[]) => makeOk(makeClassExp(map(makeVarDecl, vars), cexps))) :
+    // makeFailure(`Invalid vars for ProcExp`);
 
 export const isDottedPair = (sexps: Sexp[]): boolean =>
     sexps.length === 3 && 
