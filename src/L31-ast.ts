@@ -1,6 +1,6 @@
 // ===========================================================
 // AST type models
-import { map, zipWith } from "ramda";
+import { map, reduce, zipWith } from "ramda";
 import { makeEmptySExp, makeSymbolSExp, SExpValue, makeCompoundSExp, valueToString } from '../imp/L3-value'
 import { first, second, rest, allT, isEmpty } from "../shared/list";
 import { isArray, isString, isNumericString, isIdentifier } from "../shared/type-predicates";
@@ -231,6 +231,10 @@ const isGoodBindings = (bindings: Sexp): bindings is [string, Sexp][] =>
     allT(isArray, bindings) &&
     allT(isIdentifier, map(first, bindings));
 
+const isGoodFields = (fields: Sexp): fields is string[] =>
+    isArray(fields) &&
+    reduce((acc: boolean, elem:any) : boolean => !(isArray(elem) || !isString(elem)) && acc, true, fields)
+
 const parseLetExp = (bindings: Sexp, body: Sexp[]): Result<LetExp> => {
     if (!isGoodBindings(bindings)) {
         return makeFailure('Malformed bindings in "let" expression');
@@ -247,18 +251,23 @@ export const parseLitExp = (param: Sexp): Result<LitExp> =>
     bind(parseSExp(param), (sexp: SExpValue) => makeOk(makeLitExp(sexp)));
 
 export const parseClassExp = (vars: Sexp, methods: Sexp): Result<ClassExp> =>{
+    console.log(vars)
     if (!isGoodBindings(methods))
         return makeFailure('Malformed bindings in "Class" expression');
-    if (!(isArray(vars) && allT(isString, vars)))
-        return  makeFailure(`Invalid vars for ClassExp`);
+    if (!(isGoodFields(vars) && (vars.length != 0) && allT(isString, vars)))
+        return makeFailure(`Invalid vars for ClassExp`);
     const methodsNames = map(a => a[0], methods);
     const methodsBody = mapResult(methods => parseL31CExp(second(methods)), methods);
-    const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body)));
-    const fields = mapResult(makeOk(makeVarDecl), vars);
-    return safe2((vars: VarDecl[], methods: Binding[]) => makeOk(makeClassExp(vars, methods)))
-    (fields, methodsBindings); 
+    const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body))); 
+    // up here we have binding of methods and methods names
+    const fields = makeOk(map(makeVarDecl, vars));
+    return safe2((x : VarDecl[], y: Binding[]) => makeOk(makeClassExp(x, y)))(fields, methodsBindings);
+
 }
 
+    // return makeOk(makeClassExp(fields, methodsBindings))
+    // bind((vars: VarDecl[], methods: Binding[]) => makeOk(makeClassExp(vars, methods)))
+    // (fields, methodsBindings); 
     // isArray(vars) && allT(isString, vars) ? bind(mapResult(parseL31CExp, methods),
     //     (cexps: CExp[]) => makeOk(makeClassExp(map(makeVarDecl, vars), cexps))) :
     // makeFailure(`Invalid vars for ProcExp`);
@@ -310,6 +319,9 @@ const unparseProcExp = (pe: ProcExp): string =>
 const unparseLetExp = (le: LetExp) : string => 
     `(let (${map((b: Binding) => `(${b.var.var} ${unparseL31(b.val)})`, le.bindings).join(" ")}) ${unparseLExps(le.body)})`
 
+const unparseClassExp = (cl: ClassExp) : string =>
+    `(class (${map((v: VarDecl) => v.var, cl.fields).join(" ")}) ${map((b: Binding) => `(${b.var.var} ${unparseL31(b.val)})`, cl.methods).join(" ")})`
+
 export const unparseL31 = (exp: Program | Exp): string =>
     isBoolExp(exp) ? valueToString(exp.val) :
     isNumExp(exp) ? valueToString(exp.val) :
@@ -323,4 +335,5 @@ export const unparseL31 = (exp: Program | Exp): string =>
     isLetExp(exp) ? unparseLetExp(exp) :
     isDefineExp(exp) ? `(define ${exp.var.var} ${unparseL31(exp.val)})` :
     isProgram(exp) ? `(L31 ${unparseLExps(exp.exps)})` :
+    isClassExp(exp) ? unparseClassExp(exp) :
     exp;
