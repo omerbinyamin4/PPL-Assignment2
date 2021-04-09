@@ -231,7 +231,7 @@ const isGoodBindings = (bindings: Sexp): bindings is [string, Sexp][] =>
     allT(isArray, bindings) &&
     allT(isIdentifier, map(first, bindings));
 
-export const isGoodFields = (fields: Sexp): fields is string[] =>
+const isGoodFields = (fields: Sexp): fields is string[] =>
     isArray(fields) &&
     allT(isIdentifier, fields)
     // reduce((acc: boolean, elem:any) : boolean => !(isArray(elem) || !isString(elem)) && acc, true, fields)
