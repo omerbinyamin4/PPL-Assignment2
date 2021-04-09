@@ -231,9 +231,10 @@ const isGoodBindings = (bindings: Sexp): bindings is [string, Sexp][] =>
     allT(isArray, bindings) &&
     allT(isIdentifier, map(first, bindings));
 
-const isGoodFields = (fields: Sexp): fields is string[] =>
+export const isGoodFields = (fields: Sexp): fields is string[] =>
     isArray(fields) &&
-    reduce((acc: boolean, elem:any) : boolean => !(isArray(elem) || !isString(elem)) && acc, true, fields)
+    allT(isIdentifier, fields)
+    // reduce((acc: boolean, elem:any) : boolean => !(isArray(elem) || !isString(elem)) && acc, true, fields)
 
 const parseLetExp = (bindings: Sexp, body: Sexp[]): Result<LetExp> => {
     if (!isGoodBindings(bindings)) {
@@ -251,10 +252,9 @@ export const parseLitExp = (param: Sexp): Result<LitExp> =>
     bind(parseSExp(param), (sexp: SExpValue) => makeOk(makeLitExp(sexp)));
 
 export const parseClassExp = (vars: Sexp, methods: Sexp): Result<ClassExp> =>{
-    console.log(vars)
     if (!isGoodBindings(methods))
         return makeFailure('Malformed bindings in "Class" expression');
-    if (!(isGoodFields(vars) && (vars.length != 0) && allT(isString, vars)))
+    if (!(isGoodFields(vars) && allT(isString, vars)))
         return makeFailure(`Invalid vars for ClassExp`);
     const methodsNames = map(a => a[0], methods);
     const methodsBody = mapResult(methods => parseL31CExp(second(methods)), methods);
@@ -262,7 +262,6 @@ export const parseClassExp = (vars: Sexp, methods: Sexp): Result<ClassExp> =>{
     // up here we have binding of methods and methods names
     const fields = makeOk(map(makeVarDecl, vars));
     return safe2((x : VarDecl[], y: Binding[]) => makeOk(makeClassExp(x, y)))(fields, methodsBindings);
-
 }
 
     // return makeOk(makeClassExp(fields, methodsBindings))
