@@ -22,19 +22,19 @@ import { Sexp, Token } from "s-expression";
 ;; - The Let abbreviation is also supported.
 
 ;; <program> ::= (L31 <exp>+) // Program(exps:List(Exp))
-;; <exp> ::= <define> | <cexp>              / DefExp | CExp
-;; <define> ::= ( define <var> <cexp> )     / DefExp(var:VarDecl, val:CExp)
-;; <var> ::= <identifier>                   / VarRef(var:string)
-;; <cexp> ::= <number>                      / NumExp(val:number)
-;;         |  <boolean>                     / BoolExp(val:boolean)
-;;         |  <string>                      / StrExp(val:string)
-;;         |  ( lambda ( <var>* ) <cexp>+ ) / ProcExp(args:VarDecl[], body:CExp[]))
-;;         |  ( if <cexp> <cexp> <cexp> )   / IfExp(test: CExp, then: CExp, alt: CExp)
-;;         |  ( let ( binding* ) <cexp>+ )  / LetExp(bindings:Binding[], body:CExp[]))
-;;         |  ( quote <sexp> )              / LitExp(val:SExp)
-;;         |  ( <cexp> <cexp>* )            / AppExp(operator:CExp, operands:CExp[]))
-;;         | ( class ( <var>+ ) ( <binding>+ ) ) / ClassExp(fields:VarDecl[], methods:Binding[]))  ###L31
-;; <binding>  ::= ( <var> <cexp> )           / Binding(var:VarDecl, val:Cexp)
+;; <exp> ::= <define> | <cexp>                    / DefExp | CExp
+;; <define> ::= ( define <var> <cexp> )           / DefExp(var:VarDecl, val:CExp)
+;; <var> ::= <identifier>                         / VarRef(var:string)
+;; <cexp> ::= <number>                            / NumExp(val:number)
+;;         |  <boolean>                           / BoolExp(val:boolean)
+;;         |  <string>                            / StrExp(val:string)
+;;         |  ( lambda ( <var>* ) <cexp>+ )       / ProcExp(args:VarDecl[], body:CExp[]))
+;;         |  ( if <cexp> <cexp> <cexp> )         / IfExp(test: CExp, then: CExp, alt: CExp)
+;;         |  ( let ( binding* ) <cexp>+ )        / LetExp(bindings:Binding[], body:CExp[]))
+;;         |  ( quote <sexp> )                    / LitExp(val:SExp)
+;;         |  ( <cexp> <cexp>* )                  / AppExp(operator:CExp, operands:CExp[]))
+;;         |  ( class ( <var>+ ) ( <binding>+ ) ) / ClassExp(fields:VarDecl[], methods:Binding[]))  ###L31
+;; <binding>  ::= ( <var> <cexp> )                / Binding(var:VarDecl, val:Cexp)
 ;; <prim-op>  ::= + | - | * | / | < | > | = | not |  and | or | eq? | string=?
 ;;                  | cons | car | cdr | pair? | number? | list 
 ;;                  | boolean? | symbol? | string?      ##### L3
@@ -256,10 +256,10 @@ export const parseClassExp = (vars: Sexp, tmpMethods: Sexp[]): Result<ClassExp> 
     const methods = first(tmpMethods)
     if (!isGoodBindings(methods))
         return makeFailure('Malformed bindings in "Class" expression');
-    if (!(isGoodFields(vars) && allT(isString, vars))) // maybe without allT
+    if (!(isGoodFields(vars) && allT(isString, vars))) // @TODO: maybe without allT
         return makeFailure(`Invalid vars for ClassExp`);
     const methodsNames = map(a => a[0], methods);
-    const methodsBody = mapResult(method => parseL31CExp(second(method)), methods); //added second for method
+    const methodsBody = mapResult(method => parseL31CExp(second(method)), methods);
     const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body)));
     // up here we have binding of methods and methods names
     const fields = makeOk(map(makeVarDecl, vars));
