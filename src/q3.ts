@@ -1,6 +1,5 @@
-import { ClassExp, ProcExp, Exp, Program} from "./L31-ast";
+import { ClassExp, ProcExp, Exp, Program, Binding, AppExp, CExp, makeAppExp, makeBoolExp, makeIfExp, makePrimOp, makeProcExp, makeStrExp, makeVarDecl, makeVarRef, PrimOp, VarDecl} from "./L31-ast";
 import { Result, makeFailure } from "../shared/result";
-import { AppExp, Binding, CExp, makeAppExp, makeBoolExp, makeIfExp, makePrimOp, makeProcExp, makeStrExp, makeVarDecl, makeVarRef, PrimOp, VarDecl } from "../imp/L3-ast";
 
 /*
 Purpose: Transform ClassExp to ProcExp
@@ -9,9 +8,8 @@ Type: ClassExp => ProcExp
 */
 export const class2proc = (exp: ClassExp): ProcExp =>{
     const vars: VarDecl[] = exp.fields;
-    const methods: Binding[] = exp.methods;
-    const body: CExp[] = [makeProcExp([makeVarDecl("3")], [method2if(methods, 0)])];
-
+    const body: CExp[] = [makeProcExp([makeVarDecl("msg")], [method2if(exp.methods, 0)])];
+    return makeProcExp(vars, body);
 }
 
 const method2if = (methods: Binding[], index: number) : CExp => {
@@ -22,8 +20,6 @@ const method2if = (methods: Binding[], index: number) : CExp => {
         const test: AppExp = makeAppExp(makePrimOp("eq?"), [makeVarRef("msg"), makeStrExp(methods[index].var.var)]);
         return makeIfExp(test, methods[index].val, method2if(methods, index + 1));
     }
-    
-
 }
     //@TODO
 
