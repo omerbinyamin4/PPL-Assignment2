@@ -210,7 +210,7 @@ const isPrimitiveOp = (x: string): boolean =>
      "number?", "boolean?", "symbol?", "string?"].includes(x);
 
 const isSpecialForm = (x: string): boolean =>
-    ["if", "lambda", "let", "quote"].includes(x);
+    ["if", "lambda", "let", "quote", "class"].includes(x);
 
 const parseAppExp = (op: Sexp, params: Sexp[]): Result<AppExp> =>
     safe2((rator: CExp, rands: CExp[]) => makeOk(makeAppExp(rator, rands)))
@@ -249,27 +249,22 @@ const parseLetExp = (bindings: Sexp, body: Sexp[]): Result<LetExp> => {
 
 // sexps has the shape (quote <sexp>)
 export const parseLitExp = (param: Sexp): Result<LitExp> =>
-    bind(parseSExp(param), (sexp: SExpValue) => makeOk(makeLitExp(sexp)));
+    bind(parseSExp(param), (sexp: SExpValue) => makeOk(makeLitExp(sexp)))
 
-export const parseClassExp = (vars: Sexp, methods: Sexp): Result<ClassExp> =>{
+    
+export const parseClassExp = (vars: Sexp, tmpMethods: Sexp[]): Result<ClassExp> =>{
+    const methods = first(tmpMethods)
     if (!isGoodBindings(methods))
         return makeFailure('Malformed bindings in "Class" expression');
-    if (!(isGoodFields(vars) && allT(isString, vars)))
+    if (!(isGoodFields(vars) && allT(isString, vars))) // maybe without allT
         return makeFailure(`Invalid vars for ClassExp`);
     const methodsNames = map(a => a[0], methods);
-    const methodsBody = mapResult(methods => parseL31CExp(second(methods)), methods);
-    const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body))); 
+    const methodsBody = mapResult(method => parseL31CExp(second(method)), methods); //added second for method
+    const methodsBindings = bind(methodsBody, (body: CExp[]) => makeOk(zipWith(makeBinding, methodsNames, body)));
     // up here we have binding of methods and methods names
     const fields = makeOk(map(makeVarDecl, vars));
     return safe2((x : VarDecl[], y: Binding[]) => makeOk(makeClassExp(x, y)))(fields, methodsBindings);
-}
-
-    // return makeOk(makeClassExp(fields, methodsBindings))
-    // bind((vars: VarDecl[], methods: Binding[]) => makeOk(makeClassExp(vars, methods)))
-    // (fields, methodsBindings); 
-    // isArray(vars) && allT(isString, vars) ? bind(mapResult(parseL31CExp, methods),
-    //     (cexps: CExp[]) => makeOk(makeClassExp(map(makeVarDecl, vars), cexps))) :
-    // makeFailure(`Invalid vars for ProcExp`);
+} 
 
 export const isDottedPair = (sexps: Sexp[]): boolean =>
     sexps.length === 3 && 
@@ -319,7 +314,7 @@ const unparseLetExp = (le: LetExp) : string =>
     `(let (${map((b: Binding) => `(${b.var.var} ${unparseL31(b.val)})`, le.bindings).join(" ")}) ${unparseLExps(le.body)})`
 
 const unparseClassExp = (cl: ClassExp) : string =>
-    `(class (${map((v: VarDecl) => v.var, cl.fields).join(" ")}) ${map((b: Binding) => `(${b.var.var} ${unparseL31(b.val)})`, cl.methods).join(" ")})`
+    `(class (${map((v: VarDecl) => v.var, cl.fields).join(" ")}) (${map((b: Binding) => `(${b.var.var} ${unparseL31(b.val)})`, cl.methods).join(" ")}))`
 
 export const unparseL31 = (exp: Program | Exp): string =>
     isBoolExp(exp) ? valueToString(exp.val) :
