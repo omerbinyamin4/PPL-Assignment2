@@ -32,8 +32,7 @@ Type: [Exp | Program] => Result<Exp | Program>
 export const L31ToL3 = (exp: Exp | Program): Result<Exp | Program> =>
     isExp(exp) ? rewriteAllClassExp(exp) :
     isProgram(exp) ? rewriteAllClassProgram(exp) :
-    makeFailure("error1"); // @TODO: what to write?
-    // makeProgram(map(rewriteAllClassExp, exp.exps)) : mapResult(rewriteAllClassExp, exp.exps)
+    makeFailure("Argument is not Exp Or Program"); 
 
 const rewriteAllClassProgram = (exp: Program) : Result<Program> => {
     const x : Result<Exp[]> = mapResult(rewriteAllClassExp, exp.exps);
@@ -43,7 +42,7 @@ const rewriteAllClassProgram = (exp: Program) : Result<Program> => {
 const rewriteAllClassExp = (exp: Exp) : Result<Exp> =>
     isCExp(exp) ? rewriteallClassCExp(exp) :
     isDefineExp(exp) ? rewriteAllClassDefineExp(exp) :
-    makeFailure("error2");
+    makeFailure("Exp wasn't supported");
 
 const rewriteAllClassDefineExp = (exp: DefineExp) : Result<Exp> => {
     const val : Result<CExp> = rewriteallClassCExp(exp.val);
