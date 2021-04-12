@@ -1,12 +1,9 @@
-import { AppExp, Exp, IfExp, isAppExp, isBoolExp, isCompoundExp, isDefineExp, isIfExp, isLetExp, isLitExp, isNumExp, isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, PrimOp, ProcExp, VarDecl } from '../imp/L3-ast';
-import { Closure, isClosure, isCompoundSExp, isEmptySExp, isSymbolSExp } from '../imp/L3-value';
-import { Result, makeFailure } from '../shared/result';
+import { AppExp, DefineExp, Exp, IfExp, isAppExp, isBoolExp, isDefineExp, isIfExp, isNumExp, isPrimOp, isProcExp, isProgram, isStrExp, isVarRef, PrimOp, ProcExp, Program, VarDecl } from '../imp/L3-ast';
+import { Result, makeFailure, makeOk, bind, isOk, mapResult } from '../shared/result';
 import { isNumber, isString } from "../shared/type-predicates";
-import { map, slice } from "ramda";
+import { map } from "ramda";
 
 type Value = number | boolean | string | PrimOp /*| Closure*/;
-type CompoundExp = AppExp | IfExp | ProcExp;
-
 
 /*
 Purpose: Transform L2 AST to Python program string
@@ -17,42 +14,67 @@ export const l2ToPython = (exp: Exp | Program): Result<string>  =>
     isBoolExp(exp) ? valueToString(exp.val) :
     isNumExp(exp) ? valueToString(exp.val) :
     isStrExp(exp) ? valueToString(exp.val) :
-    isVarRef(exp) ? exp.var :
+    isVarRef(exp) ? makeOk(exp.var) :
     isProcExp(exp) ? unparseProcExp(exp) :
-    isIfExp(exp) ? `(${l2ToPython(exp.then)} if ${l2ToPython(exp.test)} else ${l2ToPython(exp.alt)})` :
+    isIfExp(exp) ? unparseIfExp(exp) :
     isAppExp(exp) ? unparseAppExp(exp, isInTheMiddle(exp)) :
-    isPrimOp(exp) ? valueToString(exp.op) :
-    isDefineExp(exp) ? `(define ${exp.var.var} ${l2ToPython(exp.val)})` : // @TODO
+    isPrimOp(exp) ? valueToString(exp) :
+    isDefineExp(exp) ? unparseDefineExp(exp) :
     isProgram(exp) ? unparseLExps(exp.exps) :
-    exp;
+    makeFailure("error");
 
-const valueToString = (val: Value): string =>
-    isNumber(val) ?  val.toString() :
-    val === true ? 'True' :
-    val === false ? 'False' :
-    isString(val) ? `"${val}"` :
+const valueToString = (val: Value): Result<string> =>
+    isNumber(val) ?  makeOk(val.toString()) :
+    val === true ? makeOk('True') :
+    val === false ? makeOk('False') :
+    isPrimOp(val) ? primOpToString(val.op) :
+    isString(val) ? makeOk(`"${val}"`) :
     // isClosure(val) ? closureToString(val) :
-    // isCompoundExp(val) ? co
-    isPrimOp(val) ? val.op : // @TODO make prec
-    val;
+    makeFailure("never");
 
 // const closureToString = (val : Closure) : string =>
 
-const unparseProcExp = (pe : ProcExp) : string =>
-    `(lambda ${slice(0, -2, map((p: VarDecl) => p.var, pe.args).join(", "))} : ${unparseLExps(pe.body)})` // @TODO one paramater ()
+const unparseProcExp = (pe : ProcExp) : Result<string> =>{
+    const result = unparseLExps(pe.body);
+    return isOk(result) ? makeOk(`(lambda ${map((p: VarDecl) => p.var, pe.args).join(",")} : ${result.value})`) :
+        makeFailure("failed to unparse proc body");
+    }
 
-const unparseLExps = (les: Exp[]): string =>
-    map(l2ToPython, les).join(""); // @TODO maybe change
+const unparseLExps = (les: Exp[]): Result<string> =>
+    les.length == 1 ? bind(mapResult(l2ToPython, les), (x: string[]) => makeOk(x.join(""))) : 
+        bind(mapResult(l2ToPython, les), (x: string[]) => makeOk(x.join("\n")));
 
-const unparseAppExp = (ap : AppExp, isInTheMiddle: boolean) : string => {
-    const y : string = `${l2ToPython(ap.rator)}`;
-    if (isInTheMiddle) return `${map((x : Exp) : string => `${l2ToPython(x)} ${y}`, ap.rands)}` // @TODO delete last op
-    else 
-    // `(${l2ToPython(exp.rator)} ${unparseLExps(exp.rands)})`
-
-
-    
+const unparseAppExp = (ap : AppExp, isInTheMiddle: boolean) : Result<string> => {
+    const opResult : Result<string> = l2ToPython(ap.rator);
+    const randsResult : Result<string[]> = mapResult((x : Exp) : Result<string> => l2ToPython(x), ap.rands);
+    if (isOk(opResult) && isOk(randsResult)) {
+        if (isInTheMiddle) return makeOk(`(${randsResult.value.join(` ${opResult.value} `)})`)
+        else if (opResult.value === 'not') return makeOk(`(${opResult.value} ${randsResult.value.join("")})`)
+        else return makeOk(`${opResult.value}(${randsResult.value.join(",")})`)
+    }
+    return makeFailure("failed to unparse AppExp");  
 }
 
 const isInTheMiddle = (ap: AppExp) : boolean =>
-    isPrimOp(ap.rator) ? !(((ap.rator.op) === '?boolean') || ((ap.rator.op) === '?number')) : true // can be other than than primOP?
+    isPrimOp(ap.rator) ? !(((ap.rator.op) === '?boolean') || ((ap.rator.op) === '?number') || ((ap.rator.op) === 'not')) : 
+    false
+
+const primOpToString = (op : string) : Result<string> =>
+    op === 'boolean?' ? makeOk(`(lambda x : (type(x) == bool))`) :
+    op === 'number?' ? makeOk(`(lambda x : ((type(x) == int) or (type(x) == float))`) :
+    op === 'eq?' || op === '=' ? makeOk(`==`) :
+    makeOk(op);
+
+const unparseIfExp = (ie : IfExp) : Result<string> => {
+    const testResult : Result<string> = l2ToPython(ie.test);
+    const thenResult : Result<string> = l2ToPython(ie.then);
+    const elseResult : Result<string> = l2ToPython(ie.alt);
+    if (isOk(testResult) && isOk(thenResult) && isOk(elseResult))
+        return makeOk(`(${thenResult.value} if ${testResult.value} else ${elseResult.value})`)
+    else return makeFailure("failed unparse ifExp")
+}
+
+const unparseDefineExp = (de : DefineExp) : Result<string> => {
+    const valueResult : Result<string> = l2ToPython(de.val);
+    return isOk(valueResult) ? makeOk(`${de.var.var} = ${valueResult.value}`) : makeFailure("failed to parse defEXP")
+}
